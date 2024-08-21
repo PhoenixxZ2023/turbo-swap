@@ -220,7 +220,7 @@ echo -e "${GREEN}Swap criada e ativada com sucesso.${NC}"
 
 # Criação do serviço systemd para limpeza periódica
 echo "[Unit]
-Description=Limpeza de cache e swap
+Description=Limpeza periódica de cache e swap
 After=network.target
 
 [Service]
