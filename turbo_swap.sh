@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CONFIG_FILE="/etc/ssh/sshd_config"
-TEMP_FILE="/tmp/sshd"
+BACKUP_FILE="/etc/ssh/sshd_config.bak"
 
 # Função para modificar o arquivo de configuração do SSH
 modify_sshd_config() {
@@ -12,10 +12,13 @@ modify_sshd_config() {
     fi
 }
 
+# Backup do arquivo de configuração do SSH
+cp "$CONFIG_FILE" "$BACKUP_FILE"
+
 # Modificar o arquivo de configuração do SSH
 modify_sshd_config "prohibit-password" "yes"
 modify_sshd_config "without-password" "yes"
-modify_sshd_config "#PermitRootLogin" "PermitRootLogin"
+modify_sshd_config "^#PermitRootLogin.*" "PermitRootLogin yes"
 
 # Remover entradas de configuração específicas
 for setting in "PasswordAuthentication" "X11Forwarding" "ClientAliveInterval" "ClientAliveCountMax" "MaxStartups"; do
@@ -94,7 +97,7 @@ executar_comando() {
 # Limpeza inicial
 clear
 echo -e "${YELLOW}======================================${NC}"
-echo -e "${YELLOW}              TURBO-SWAP${NC}"
+echo -e "${YELLOW}              GESTOR-SWAP${NC}"
 echo -e "${YELLOW}======================================${NC}"
 echo
 
@@ -124,16 +127,16 @@ fi
 total_size=$(lsblk -b -d -o SIZE "/dev/$disk" | tail -n1)
 total_size_mb=$((total_size / (1024 * 1024)))
 
-swap_size=$(echo "$total_size_mb * 0.20 / 1" | bc)
+swap_size=$(echo "$total_size_mb * 0.10 / 1" | bc)
 swap_size_rounded=$(( ((swap_size + 1023) / 1024) * 1024 ))
 
 echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
 echo
 
-# Criar e ativar swap
-executar_comando "dd if=/dev/zero of=/bin/ram.img bs=1M count=$swap_size_rounded && chmod 600 /bin/ram.img && mkswap /bin/ram.img && swapon /bin/ram.img" "Criando e ativando swap"
-executar_comando "sed -i '/\/bin\/ram.img/d' /etc/fstab && echo '/bin/ram.img none swap sw 0 0' >> /etc/fstab" "Configurando swap"
+# Criar e ativar swap em /swapfile
+executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile" "Criando e ativando swap"
+executar_comando "sed -i '/\/swapfile/d' /etc/fstab && echo '/swapfile none swap sw 0 0' >> /etc/fstab" "Configurando swap"
 
 echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
 echo
@@ -196,3 +199,4 @@ executar_comando "systemctl daemon-reload && systemctl enable limpeza.service &&
 echo -e "${GREEN}Configuração concluída.${NC}"
 
 exit 0
+menu
