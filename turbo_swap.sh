@@ -115,7 +115,7 @@ executar_comando() {
     done
 
     wait $cmd_pid
-    if [ $? -eq 0 ]; então
+    if [ $? -eq 0 ]; then
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
         log_message "Comando executado com sucesso: $comando"
@@ -154,7 +154,7 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 # Calcular tamanho da swap
 echo -e "${BLUE}Calculando tamanho da swap...${NC}"
 disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
-if [ -z "$disk" ]; então
+if [ -z "$disk" ]; then
     log_message "Não foi possível encontrar o disco principal."
     echo "Não foi possível encontrar o disco principal."
     exit 1
@@ -192,7 +192,7 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; então
+        if [ "$days_diff" -gt "$max_days" ]; then
             rm "$logfile"
         fi
     done
@@ -211,7 +211,7 @@ sync; echo 3 > /proc/sys/vm/drop_caches &> /dev/null
 pm2 flush &> /dev/null
 echo "$current_time - Script de limpeza executado" >> "$LOG_FILE"
 
-menu
+exit 0
 EOF
 
 chmod +x /opt/limpeza.sh
@@ -238,6 +238,3 @@ executar_comando "/etc/init.d/ssh restart" "Reiniciando o serviço SSH"
 
 echo -e "${GREEN}Configuração concluída.${NC}"
 log_message "Configuração concluída com sucesso."
-
-return
-menu
