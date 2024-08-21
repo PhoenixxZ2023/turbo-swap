@@ -101,7 +101,7 @@ executar_script() {
         done
 
         wait $cmd_pid
-        if [ $? -eq 0 ]; então
+        if [ $? -eq 0 ]; then
             percent=100
             echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
         else
@@ -137,7 +137,7 @@ executar_script() {
     # Calcular tamanho da swap
     echo -e "${BLUE}Calculando tamanho da swap...${NC}"
     disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
-    if [ -z "$disk" ]; então
+    if [ -z "$disk" ]; then
         echo "Não foi possível encontrar o disco principal."
         exit 1
     fi
@@ -172,7 +172,7 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; então
+        if [ "$days_diff" -gt "$max_days" ]; then
             rm "$logfile"
         fi
     done
@@ -216,7 +216,6 @@ EOF
     /etc/init.d/ssh restart
     echo -e "${GREEN}Configuração concluída.${NC}"
 
-    # Retornar ao menu principal após conclusão
     menu
 }
 
