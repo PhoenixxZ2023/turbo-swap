@@ -115,7 +115,7 @@ executar_comando() {
     done
 
     wait $cmd_pid
-    if [ $? -eq 0 ]; then
+    if [ $? -eq 0 ]; então
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
         log_message "Comando executado com sucesso: $comando"
@@ -154,7 +154,7 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 # Calcular tamanho da swap
 echo -e "${BLUE}Calculando tamanho da swap...${NC}"
 disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
-if [ -z "$disk" ]; then
+if [ -z "$disk" ]; então
     log_message "Não foi possível encontrar o disco principal."
     echo "Não foi possível encontrar o disco principal."
     exit 1
@@ -192,7 +192,7 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; then
+        if [ "$days_diff" -gt "$max_days" ]; então
             rm "$logfile"
         fi
     done
