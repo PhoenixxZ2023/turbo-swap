@@ -144,10 +144,6 @@ executar_comando "sync; echo 3 > /proc/sys/vm/drop_caches" "Limpando cache do si
 echo -e "${GREEN}Limpeza inicial concluída.${NC}"
 echo
 
-executar_comando "echo 1 > /proc/sys/vm/drop_caches" "Limpando a memória RAM"
-echo -e "${GREEN}Memória RAM limpa.${NC}"
-echo
-
 # Desativar qualquer swap existente
 executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualquer swap existente"
 
@@ -191,12 +187,12 @@ case "$swap_option" in
 esac
 
 # Garantir que o tamanho da swap seja pelo menos 40 MB
-if [ "$swap_size_rounded" -lt 40 ]; then
-    swap_size_rounded=40
+if [ "$swap_size" -lt 40 ]; then
+    swap_size=40
 fi
 
 # Arredondar o tamanho para o próximo MB
-swap_size_rounded=$(( ((swap_size_rounded + 1023) / 1024) * 1024 ))
+swap_size_rounded=$(( ((swap_size + 1023) / 1024) * 1024 ))
 
 echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
@@ -204,7 +200,7 @@ log_message "Tamanho da swap calculado: ${swap_size_rounded} MB"
 echo
 
 # Criar e ativar swap em /swapfile
-executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile" "Criando e ativando swap"
+executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded status=progress && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile" "Criando e ativando swap"
 executar_comando "sed -i '/\/swapfile/d' /etc/fstab && echo '/swapfile none swap sw 0 0' >> /etc/fstab" "Configurando swap"
 
 echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
