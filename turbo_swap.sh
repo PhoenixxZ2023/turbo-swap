@@ -2,6 +2,13 @@
 
 CONFIG_FILE="/etc/ssh/sshd_config"
 BACKUP_FILE="/etc/ssh/sshd_config.bak"
+LOG_FILE="/var/log/gestor_swap.log"
+
+# Função para logar mensagens
+log_message() {
+    local message="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"
+}
 
 # Função para modificar o arquivo de configuração do SSH
 modify_sshd_config() {
@@ -9,11 +16,23 @@ modify_sshd_config() {
     local replace="$2"
     if grep -q "$search" "$CONFIG_FILE"; then
         sed -i "s/$search/$replace/g" "$CONFIG_FILE"
+        if [ $? -eq 0 ]; then
+            log_message "Modificado: $search -> $replace"
+        else
+            log_message "Erro ao modificar: $search -> $replace"
+            exit 1
+        fi
     fi
 }
 
 # Backup do arquivo de configuração do SSH
 cp "$CONFIG_FILE" "$BACKUP_FILE"
+if [ $? -eq 0 ]; then
+    log_message "Backup do arquivo SSH realizado com sucesso."
+else
+    log_message "Erro ao fazer o backup do arquivo SSH."
+    exit 1
+fi
 
 # Modificar o arquivo de configuração do SSH
 modify_sshd_config "prohibit-password" "yes"
@@ -23,6 +42,12 @@ modify_sshd_config "^#PermitRootLogin.*" "PermitRootLogin yes"
 # Remover entradas de configuração específicas
 for setting in "PasswordAuthentication" "X11Forwarding" "ClientAliveInterval" "ClientAliveCountMax" "MaxStartups"; do
     sed -i "/^#\?\s*${setting}[[:space:]]/d" "$CONFIG_FILE"
+    if [ $? -eq 0 ]; then
+        log_message "Removido: $setting"
+    else
+        log_message "Erro ao remover: $setting"
+        exit 1
+    fi
 done
 
 # Adicionar configurações desejadas
@@ -33,9 +58,15 @@ done
     echo 'ClientAliveCountMax 3'
     echo 'MaxStartups 100:10:1000'
 } >> "$CONFIG_FILE"
+log_message "Configurações SSH adicionais inseridas com sucesso."
 
 # Remover o script gestor_swap.sh
 rm -f gestor_swap.sh
+if [ $? -eq 0 ]; then
+    log_message "Script gestor_swap.sh removido com sucesso."
+else
+    log_message "Erro ao remover o script gestor_swap.sh."
+fi
 
 # Função para verificar e instalar o bc se necessário
 verificar_bc() {
@@ -43,9 +74,10 @@ verificar_bc() {
         apt-get update &> /dev/null
         apt-get install -y bc &> /dev/null
         if [ $? -ne 0 ]; then
-            echo "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
+            log_message "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
             exit 1
         fi
+        log_message "'bc' instalado com sucesso."
     fi
 }
 
@@ -74,7 +106,7 @@ executar_comando() {
     
     while kill -0 $cmd_pid 2>/dev/null; do
         percent=$((percent + 1))
-        if [ $percent -ge 100 ]; then
+        if [ $percent -ge 100 ]; então
             percent=100
         fi
         echo -ne "\r[${bar:0:$((percent / 5))}] $percent%"
@@ -83,11 +115,14 @@ executar_comando() {
     done
 
     wait $cmd_pid
-    if [ $? -eq 0 ]; then
+    if [ $? -eq 0 ]; então
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
+        log_message "Comando executado com sucesso: $comando"
     else
         echo -e "\r${RED}Erro ao executar o comando.${NC}"
+        log_message "Erro ao executar o comando: $comando"
+        exit 1
     fi
     
     echo
@@ -120,6 +155,7 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 echo -e "${BLUE}Calculando tamanho da swap...${NC}"
 disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
 if [ -z "$disk" ]; then
+    log_message "Não foi possível encontrar o disco principal."
     echo "Não foi possível encontrar o disco principal."
     exit 1
 fi
@@ -132,6 +168,7 @@ swap_size_rounded=$(( ((swap_size + 1023) / 1024) * 1024 ))
 
 echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
+log_message "Tamanho da swap calculado: ${swap_size_rounded} MB"
 echo
 
 # Criar e ativar swap em /swapfile
@@ -139,6 +176,7 @@ executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded &&
 executar_comando "sed -i '/\/swapfile/d' /etc/fstab && echo '/swapfile none swap sw 0 0' >> /etc/fstab" "Configurando swap"
 
 echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
+log_message "Swap criada e ativada com sucesso."
 echo
 
 # Script de limpeza automático
@@ -154,7 +192,7 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; then
+        if [ "$days_diff" -gt "$max_days" ]; então
             rm "$logfile"
         fi
     done
@@ -173,10 +211,11 @@ sync; echo 3 > /proc/sys/vm/drop_caches &> /dev/null
 pm2 flush &> /dev/null
 echo "$current_time - Script de limpeza executado" >> "$LOG_FILE"
 
-exit 0
+menu
 EOF
 
-chmod +x /opt/limpeza.sh
+chmod 777 /opt/limpeza.sh
+log_message "Script de limpeza criado em /opt/limpeza.sh"
 
 # Serviço systemd para o script de limpeza
 cat << 'EOF' > /etc/systemd/system/limpeza.service
@@ -195,8 +234,10 @@ EOF
 executar_comando "systemctl daemon-reload && systemctl enable limpeza.service && systemctl start limpeza.service" "Configurando script de limpeza"
 
 # Reiniciar o serviço SSH
-/etc/init.d/ssh restart
+executar_comando "/etc/init.d/ssh restart" "Reiniciando o serviço SSH"
+
 echo -e "${GREEN}Configuração concluída.${NC}"
+log_message "Configuração concluída com sucesso."
 
 return
 menu
