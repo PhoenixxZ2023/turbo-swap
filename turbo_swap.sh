@@ -147,6 +147,9 @@ echo
 # Desativar qualquer swap existente
 executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualquer swap existente"
 
+# Definir o tamanho total do disco em MB
+total_size_mb=$(df --output=size / | tail -1)
+
 # Calcular tamanho da swap
 echo -e "${YELLOW}Escolha o tamanho da swap:${NC}"
 echo -e "${YELLOW}1) 10% do tamanho total do disco (recomendado)${NC}"
@@ -154,11 +157,6 @@ echo -e "${YELLOW}2) 20% do tamanho total do disco${NC}"
 echo -e "${YELLOW}3) 30% do tamanho total do disco${NC}"
 echo -e "${YELLOW}4) Definir tamanho manualmente${NC}"
 read -p "Selecione uma opção [1-4]: " swap_option
-
-# Função para verificar se a entrada é um número
-is_number() {
-    [[ "$1" =~ ^[0-9]+$ ]]
-}
 
 case "$swap_option" in
     1)
@@ -187,7 +185,7 @@ case "$swap_option" in
 esac
 
 # Garantir que o tamanho da swap seja pelo menos 40 MB
-if [ "$swap_size" -lt 40 ]; then
+if [ -z "$swap_size" ] || [ "$swap_size" -lt 40 ]; then
     swap_size=40
 fi
 
@@ -220,49 +218,32 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; then
-            rm "$logfile"
+        if [ "$days_diff" -ge "$max_days" ]; then
+            rm -f "$logfile"
         fi
     done
 }
 
 cleanup_old_logs
 
-LOG_FILE="$LOG_DIR/$(date +%Y%m%d).txt"
-current_time=$(date '+%d/%m/%Y %H:%M:%S')
-apt-get clean &> /dev/null
-apt-get autoclean &> /dev/null
-apt-get autoremove -y &> /dev/null
-find /var/log -type f \( -name '*.gz' -o -name '*.[0-9]' \) -exec rm -f {} + &> /dev/null && find /var/log -type f -exec truncate -s 0 {} + &> /dev/null
-rm -rf /tmp/* &> /dev/null
-sync; echo 3 > /proc/sys/vm/drop_caches &> /dev/null
-pm2 flush &> /dev/null
-echo "$current_time - Script de limpeza executado" >> "$LOG_FILE"
+apt-get clean
+apt-get autoclean
+apt-get autoremove -y
+find /var/log -type f -name "*.gz" -exec rm -f {} \;
+find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
+find /var/log -type f -name "*.log.*" -exec rm -f {} \;
+find /var/log -type f -name "*.[0-9]" -exec rm -f {} \;
+find /tmp -type f -exec rm -f {} \;
+find /var/tmp -type f -exec rm -f {} \;
 
-exit 0
+echo "Limpeza realizada em $(date)" >> "$LOG_DIR/limpeza_$current_date.txt"
 EOF
 
 chmod +x /opt/limpeza.sh
-log_message "Script de limpeza automática criado com sucesso."
+log_message "Script de limpeza criado em /opt/limpeza.sh."
 
-# Serviço systemd para o script de limpeza
-cat << 'EOF' > /etc/systemd/system/limpeza.service
-[Unit]
-Description=Script de limpeza do sistema
-After=network.target
+# Agendar tarefa cron para limpeza automática
+(crontab -l ; echo "0 3 * * * /opt/limpeza.sh") | crontab -
+log_message "Tarefa cron para limpeza automática agendada para 03:00 diariamente."
 
-[Service]
-Type=oneshot
-ExecStart=/bin/bash /opt/limpeza.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-executar_comando "systemctl daemon-reload && systemctl enable limpeza.service && systemctl start limpeza.service" "Configurando script de limpeza"
-
-# Reiniciar o serviço SSH
-executar_comando "/etc/init.d/ssh restart" "Reiniciando o serviço SSH"
-
-echo -e "${GREEN}Configuração concluída.${NC}"
-log_message "Configuração concluída com sucesso."
+echo -e "${GREEN}Configurações e scripts de limpeza configurados com sucesso!${NC}"
