@@ -190,8 +190,13 @@ case "$swap_option" in
         ;;
 esac
 
+# Garantir que o tamanho da swap seja pelo menos 40 MB
+if [ "$swap_size_rounded" -lt 40 ]; then
+    swap_size_rounded=40
+fi
+
 # Arredondar o tamanho para o próximo MB
-swap_size_rounded=$(( ((swap_size + 1023) / 1024) * 1024 ))
+swap_size_rounded=$(( ((swap_size_rounded + 1023) / 1024) * 1024 ))
 
 echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
