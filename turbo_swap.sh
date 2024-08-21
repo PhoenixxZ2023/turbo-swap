@@ -1,7 +1,25 @@
 #!/bin/bash
 
 CONFIG_FILE="/etc/ssh/sshd_config"
-TEMP_FILE="/tmp/sshd"
+BACKUP_FILE="/etc/ssh/sshd_config.bak"
+LOG_FILE="/var/log/gestor_swap.log"
+
+# Função para logar mensagens
+log_message() {
+    local message="$1"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $message" >> "$LOG_FILE"
+}
+
+# Função para restaurar backup em caso de erro
+restore_backup() {
+    cp "$BACKUP_FILE" "$CONFIG_FILE"
+    if [ $? -eq 0 ]; then
+        log_message "Backup restaurado com sucesso."
+    else
+        log_message "Erro ao restaurar o backup."
+        exit 1
+    fi
+}
 
 # Função para modificar o arquivo de configuração do SSH
 modify_sshd_config() {
@@ -9,17 +27,40 @@ modify_sshd_config() {
     local replace="$2"
     if grep -q "$search" "$CONFIG_FILE"; then
         sed -i "s/$search/$replace/g" "$CONFIG_FILE"
+        if [ $? -eq 0 ]; then
+            log_message "Modificado: $search -> $replace"
+        else
+            log_message "Erro ao modificar: $search -> $replace"
+            restore_backup
+            exit 1
+        fi
     fi
 }
+
+# Backup do arquivo de configuração do SSH
+cp "$CONFIG_FILE" "$BACKUP_FILE"
+if [ $? -eq 0 ]; then
+    log_message "Backup do arquivo SSH realizado com sucesso."
+else
+    log_message "Erro ao fazer o backup do arquivo SSH."
+    exit 1
+fi
 
 # Modificar o arquivo de configuração do SSH
 modify_sshd_config "prohibit-password" "yes"
 modify_sshd_config "without-password" "yes"
-modify_sshd_config "#PermitRootLogin" "PermitRootLogin"
+modify_sshd_config "^#PermitRootLogin.*" "PermitRootLogin yes"
 
 # Remover entradas de configuração específicas
 for setting in "PasswordAuthentication" "X11Forwarding" "ClientAliveInterval" "ClientAliveCountMax" "MaxStartups"; do
     sed -i "/^#\?\s*${setting}[[:space:]]/d" "$CONFIG_FILE"
+    if [ $? -eq 0 ]; then
+        log_message "Removido: $setting"
+    else
+        log_message "Erro ao remover: $setting"
+        restore_backup
+        exit 1
+    fi
 done
 
 # Adicionar configurações desejadas
@@ -30,9 +71,15 @@ done
     echo 'ClientAliveCountMax 3'
     echo 'MaxStartups 100:10:1000'
 } >> "$CONFIG_FILE"
+log_message "Configurações SSH adicionais inseridas com sucesso."
 
-# Remover o script gestor_swap.sh
-rm -f gestor_swap.sh
+# Verificar se a configuração SSH está válida antes de reiniciar
+sshd -t
+if [ $? -ne 0 ]; then
+    log_message "Erro na configuração SSH. Restaurando backup."
+    restore_backup
+    exit 1
+fi
 
 # Função para verificar e instalar o bc se necessário
 verificar_bc() {
@@ -40,9 +87,10 @@ verificar_bc() {
         apt-get update &> /dev/null
         apt-get install -y bc &> /dev/null
         if [ $? -ne 0 ]; then
-            echo "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
+            log_message "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
             exit 1
         fi
+        log_message "'bc' instalado com sucesso."
     fi
 }
 
@@ -83,8 +131,11 @@ executar_comando() {
     if [ $? -eq 0 ]; then
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
+        log_message "Comando executado com sucesso: $comando"
     else
         echo -e "\r${RED}Erro ao executar o comando.${NC}"
+        log_message "Erro ao executar o comando: $comando"
+        exit 1
     fi
     
     echo
@@ -94,7 +145,7 @@ executar_comando() {
 # Limpeza inicial
 clear
 echo -e "${YELLOW}======================================${NC}"
-echo -e "${YELLOW}              TURBO-SWAP${NC}"
+echo -e "${YELLOW}              GESTOR-SWAP${NC}"
 echo -e "${YELLOW}======================================${NC}"
 echo
 
@@ -117,6 +168,7 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 echo -e "${BLUE}Calculando tamanho da swap...${NC}"
 disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
 if [ -z "$disk" ]; then
+    log_message "Não foi possível encontrar o disco principal."
     echo "Não foi possível encontrar o disco principal."
     exit 1
 fi
@@ -124,18 +176,47 @@ fi
 total_size=$(lsblk -b -d -o SIZE "/dev/$disk" | tail -n1)
 total_size_mb=$((total_size / (1024 * 1024)))
 
-swap_size=$(echo "$total_size_mb * 0.20 / 1" | bc)
+echo -e "${YELLOW}Escolha o tamanho da swap:${NC}"
+echo -e "${YELLOW}1) 10% do tamanho total do disco (recomendado)${NC}"
+echo -e "${YELLOW}2) 20% do tamanho total do disco${NC}"
+echo -e "${YELLOW}3) 30% do tamanho total do disco${NC}"
+echo -e "${YELLOW}4) Definir tamanho manualmente${NC}"
+read -p "Selecione uma opção [1-4]: " swap_option
+
+case "$swap_option" in
+    1)
+        swap_size=$(echo "$total_size_mb * 0.10 / 1" | bc)
+        ;;
+    2)
+        swap_size=$(echo "$total_size_mb * 0.20 / 1" | bc)
+        ;;
+    3)
+        swap_size=$(echo "$total_size_mb * 0.30 / 1" | bc)
+        ;;
+    4)
+        read -p "Digite o tamanho da swap em MB: " swap_size
+        ;;
+    *)
+        echo -e "${RED}Opção inválida!${NC}"
+        exit 1
+        ;;
+esac
+
 swap_size_rounded=$(( ((swap_size + 1023) / 1024) * 1024 ))
 
 echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
+log_message "Tamanho da swap calculado: ${swap_size_rounded} MB"
 echo
 
-# Criar e ativar swap
-executar_comando "dd if=/dev/zero of=/bin/ram.img bs=1M count=$swap_size_rounded && chmod 600 /bin/ram.img && mkswap /bin/ram.img && swapon /bin/ram.img" "Criando e ativando swap"
-executar_comando "sed -i '/\/bin\/ram.img/d' /etc/fstab && echo '/bin/ram.img none swap sw 0 0' >> /etc/fstab" "Configurando swap"
+# Criar e ativar swap em /swapfile
+executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile" "Criando e ativando swap"
+
+# Garantir que a swap será ativada na reinicialização
+executar_comando "grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab" "Configurando swap no fstab"
 
 echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
+log_message "Swap criada e ativada com sucesso."
 echo
 
 # Script de limpeza automático
@@ -174,6 +255,7 @@ exit 0
 EOF
 
 chmod +x /opt/limpeza.sh
+log_message "Script de limpeza automática criado com sucesso."
 
 # Serviço systemd para o script de limpeza
 cat << 'EOF' > /etc/systemd/system/limpeza.service
@@ -184,15 +266,18 @@ After=network.target
 [Service]
 Type=oneshot
 ExecStart=/bin/bash /opt/limpeza.sh
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-executar_comando "systemctl daemon-reload && systemctl enable limpeza.service && systemctl start limpeza.service" "Configurando script de limpeza"
+executar_comando "systemctl daemon-reload && systemctl enable limpeza.service" "Configurando o serviço de limpeza no systemd"
+
+echo -e "${GREEN}Serviço de limpeza configurado e habilitado.${NC}"
 
 # Reiniciar o serviço SSH
-/etc/init.d/ssh restart
-echo -e "${GREEN}Configuração concluída.${NC}"
+executar_comando "/etc/init.d/ssh restart" "Reiniciando o serviço SSH"
 
-exit 0
+echo -e "${GREEN}Configuração concluída.${NC}"
+log_message "Configuração concluída com sucesso."
