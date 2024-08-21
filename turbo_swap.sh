@@ -198,5 +198,4 @@ executar_comando "systemctl daemon-reload && systemctl enable limpeza.service &&
 /etc/init.d/ssh restart
 echo -e "${GREEN}Configuração concluída.${NC}"
 
-exit 0
-menu
+menu 0
