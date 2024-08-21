@@ -106,7 +106,7 @@ executar_comando() {
     
     while kill -0 $cmd_pid 2>/dev/null; do
         percent=$((percent + 1))
-        if [ $percent -ge 100 ]; então
+        if [ $percent -ge 100 ]; then
             percent=100
         fi
         echo -ne "\r[${bar:0:$((percent / 5))}] $percent%"
@@ -115,7 +115,7 @@ executar_comando() {
     done
 
     wait $cmd_pid
-    if [ $? -eq 0 ]; então
+    if [ $? -eq 0 ]; then
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
         log_message "Comando executado com sucesso: $comando"
@@ -192,7 +192,7 @@ cleanup_old_logs() {
     for logfile in "$LOG_DIR"/*.txt; do
         log_date=$(basename "$logfile" .txt | cut -c1-8)
         days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -gt "$max_days" ]; então
+        if [ "$days_diff" -gt "$max_days" ]; then
             rm "$logfile"
         fi
     done
@@ -214,8 +214,8 @@ echo "$current_time - Script de limpeza executado" >> "$LOG_FILE"
 menu
 EOF
 
-chmod 777 /opt/limpeza.sh
-log_message "Script de limpeza criado em /opt/limpeza.sh"
+chmod +x /opt/limpeza.sh
+log_message "Script de limpeza automática criado com sucesso."
 
 # Serviço systemd para o script de limpeza
 cat << 'EOF' > /etc/systemd/system/limpeza.service
