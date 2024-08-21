@@ -119,7 +119,7 @@ executar_comando() {
     
     while kill -0 $cmd_pid 2>/dev/null; do
         percent=$((percent + 1))
-        if [ $percent -ge 100 ]; então
+        if [ $percent -ge 100 ]; then
             percent=100
         fi
         echo -ne "\r[${bar:0:$((percent / 5))}] $percent%"
@@ -128,7 +128,7 @@ executar_comando() {
     done
 
     wait $cmd_pid
-    if [ $? -eq 0 ]; então
+    if [ $? -eq 0 ]; then
         percent=100
         echo -ne "\r[${bar:0:20}] $percent%${NC}\n"
         log_message "Comando executado com sucesso: $comando"
@@ -168,7 +168,7 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 # Calcular tamanho da swap
 echo -e "${BLUE}Calculando tamanho da swap...${NC}"
 disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
-if [ -z "$disk" ]; então
+if [ -z "$disk" ]; then
     log_message "Não foi possível encontrar o disco principal."
     echo "Não foi possível encontrar o disco principal."
     exit 1
