@@ -94,7 +94,7 @@ executar_comando() {
 # Limpeza inicial
 clear
 echo -e "${YELLOW}======================================${NC}"
-echo -e "${YELLOW}              GESTOR-SWAP${NC}"
+echo -e "${YELLOW}              TURBO-SWAP${NC}"
 echo -e "${YELLOW}======================================${NC}"
 echo
 
