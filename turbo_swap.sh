@@ -23,7 +23,7 @@ menu_principal() {
     read -p "Escolha uma opção: " opcao
     case $opcao in
         1) executar_script ;;
-        2) menu ;;
+        2) exit 0 ;;
         *) echo "Opção inválida!"; menu_principal ;;
     esac
 }
@@ -216,8 +216,8 @@ EOF
     /etc/init.d/ssh restart
     echo -e "${GREEN}Configuração concluída.${NC}"
 
-    menu
+    menu_principal
 }
 
 # Chamar o menu principal ao iniciar o script
-menu
+menu_principal
