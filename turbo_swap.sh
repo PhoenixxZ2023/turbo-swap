@@ -177,10 +177,10 @@ case "$swap_option" in
     4)
         while true; do
             read -p "Digite o tamanho da swap em MB: " swap_size
-            if is_number "$swap_size" && [ "$swap_size" -gt 0 ]; then
+            if is_number "$swap_size" && [ "$swap_size" -ge 40 ]; then
                 break
             else
-                echo -e "${RED}Entrada inválida. Por favor, insira um número positivo.${NC}"
+                echo -e "${RED}Entrada inválida. Por favor, insira um número positivo e maior ou igual a 40.${NC}"
             fi
         done
         ;;
