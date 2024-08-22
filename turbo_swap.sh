@@ -2,6 +2,13 @@
 set -e
 set -u
 
+# Definindo cores
+BLUE='\033[1;34m'
+GREEN='\033[1;32m'
+RED='\033[1;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'  # No Color
+
 CONFIG_FILE="/etc/ssh/sshd_config"
 TEMP_FILE="/tmp/sshd"
 
@@ -24,9 +31,9 @@ executar_comando() {
 
     echo -e "${BLUE}${mensagem:0:50}...${NC}"
     echo -n ' '
-    
+
     eval "$comando" & local cmd_pid=$!
-    
+
     while kill -0 $cmd_pid 2>/dev/null; do
         percent=$((percent + 1))
         if [ $percent -ge 100 ]; then
@@ -44,7 +51,7 @@ executar_comando() {
     else
         echo -e "\r${RED}Erro ao executar o comando.${NC}"
     fi
-    
+
     echo
     sleep 1
 }
@@ -55,7 +62,7 @@ verificar_bc() {
         apt-get update &> /dev/null
         apt-get install -y bc &> /dev/null
         if [ $? -ne 0 ]; then
-            echo "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
+            echo -e "${RED}Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente.${NC}"
             exit 1
         fi
     fi
@@ -121,7 +128,7 @@ if [ -z "${swap_size_rounded-}" ]; then
     echo -e "${BLUE}Calculando tamanho da swap...${NC}"
     disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
     if [ -z "$disk" ]; then
-        echo "Não foi possível encontrar o disco principal."
+        echo -e "${RED}Não foi possível encontrar o disco principal.${NC}"
         exit 1
     fi
 
@@ -192,9 +199,9 @@ EOF
 executar_comando "systemctl daemon-reload && systemctl enable limpeza.service && systemctl start limpeza.service" "Configurando script de limpeza"
 
 # Reiniciar o serviço SSH
-/etc/init.d/ssh restart
+executar_comando "systemctl restart ssh" "Reiniciando o serviço SSH"
+
 echo -e "${GREEN}Configuração concluída.${NC}"
 
 return
 menu
-
