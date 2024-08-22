@@ -147,16 +147,26 @@ echo
 # Desativar qualquer swap existente
 executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualquer swap existente"
 
-# Definir o tamanho total do disco em MB
-total_size_mb=$(df --output=size / | tail -1)
+# Verificar o espaço disponível em disco
+disponivel=$(df --output=avail / | tail -1)
+disponivel_mb=$(echo "$disponivel / 1024" | bc)
+
+echo "Espaço disponível no disco: $disponivel_mb MB"
 
 # Calcular tamanho da swap
+total_size_mb=$(df --output=size / | tail -1)
+
 echo -e "${YELLOW}Escolha o tamanho da swap:${NC}"
 echo -e "${YELLOW}1) 10% do tamanho total do disco (recomendado)${NC}"
 echo -e "${YELLOW}2) 20% do tamanho total do disco${NC}"
 echo -e "${YELLOW}3) 30% do tamanho total do disco${NC}"
 echo -e "${YELLOW}4) Definir tamanho manualmente${NC}"
 read -p "Selecione uma opção [1-4]: " swap_option
+
+# Função para verificar se a entrada é um número
+is_number() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
 
 case "$swap_option" in
     1)
@@ -184,8 +194,14 @@ case "$swap_option" in
         ;;
 esac
 
+# Verificar se há espaço suficiente em disco
+if [ "$swap_size" -gt "$disponivel_mb" ]; then
+    echo -e "${RED}Erro: Espaço insuficiente no disco para criar uma swap de $swap_size MB.${NC}"
+    exit 1
+fi
+
 # Garantir que o tamanho da swap seja pelo menos 40 MB
-if [ -z "$swap_size" ] || [ "$swap_size" -lt 40 ]; then
+if [ "$swap_size" -lt 40 ]; then
     swap_size=40
 fi
 
@@ -202,48 +218,26 @@ executar_comando "dd if=/dev/zero of=/swapfile bs=1M count=$swap_size_rounded st
 executar_comando "sed -i '/\/swapfile/d' /etc/fstab && echo '/swapfile none swap sw 0 0' >> /etc/fstab" "Configurando swap"
 
 echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
-log_message "Swap criada e ativada com sucesso."
-echo
+log_message "Swap criada e ativada com sucesso: ${swap_size_rounded} MB"
 
-# Script de limpeza automático
-cat << 'EOF' > /opt/limpeza.sh
-#!/bin/bash
+# Configurar swappiness
+sysctl vm.swappiness=10
+echo 'vm.swappiness=10' | tee -a /etc/sysctl.conf
 
-LOG_DIR="/root/limpeza"
-mkdir -p "$LOG_DIR"
-current_date=$(date +%Y%m%d)
-max_days=7
+echo -e "${GREEN}Configuração de swappiness ajustada para 10.${NC}"
+log_message "Swappiness ajustada para 10."
 
-cleanup_old_logs() {
-    for logfile in "$LOG_DIR"/*.txt; do
-        log_date=$(basename "$logfile" .txt | cut -c1-8)
-        days_diff=$(( (current_date - log_date) / 10000 ))
-        if [ "$days_diff" -ge "$max_days" ]; then
-            rm -f "$logfile"
-        fi
-    done
-}
+# Exibir status final da swap
+echo -e "${YELLOW}Status atual da swap:${NC}"
+swapon --show
 
-cleanup_old_logs
+# Recarregar o serviço SSH
+systemctl restart ssh
+if [ $? -eq 0 ]; then
+    log_message "Serviço SSH reiniciado com sucesso."
+else
+    log_message "Erro ao reiniciar o serviço SSH."
+    exit 1
+fi
 
-apt-get clean
-apt-get autoclean
-apt-get autoremove -y
-find /var/log -type f -name "*.gz" -exec rm -f {} \;
-find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
-find /var/log -type f -name "*.log.*" -exec rm -f {} \;
-find /var/log -type f -name "*.[0-9]" -exec rm -f {} \;
-find /tmp -type f -exec rm -f {} \;
-find /var/tmp -type f -exec rm -f {} \;
-
-echo "Limpeza realizada em $(date)" >> "$LOG_DIR/limpeza_$current_date.txt"
-EOF
-
-chmod +x /opt/limpeza.sh
-log_message "Script de limpeza criado em /opt/limpeza.sh."
-
-# Agendar tarefa cron para limpeza automática
-(crontab -l ; echo "0 3 * * * /opt/limpeza.sh") | crontab -
-log_message "Tarefa cron para limpeza automática agendada para 03:00 diariamente."
-
-echo -e "${GREEN}Configurações e scripts de limpeza configurados com sucesso!${NC}"
+echo -e "${GREEN}Configuração SSH concluída e serviço reiniciado.${NC}"
