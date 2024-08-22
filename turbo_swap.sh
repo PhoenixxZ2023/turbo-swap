@@ -98,6 +98,21 @@ echo -e "${YELLOW}              TURBO-SWAP${NC}"
 echo -e "${YELLOW}======================================${NC}"
 echo
 
+executar_comando "apt-get clean && apt-get autoclean && apt-get autoremove -y" "Limpando cache de pacotes"
+executar_comando "find /var/log -type f \( -name '*.gz' -o -name '*.[0-9]' \) -exec rm -f {} + && find /var/log -type f -exec truncate -s 0 {} +" "Limpando logs antigos"
+executar_comando "rm -rf /tmp/*" "Limpando arquivos temporários"
+executar_comando "sync; echo 3 > /proc/sys/vm/drop_caches" "Limpando cache do sistema"
+
+echo -e "${GREEN}Limpeza inicial concluída.${NC}"
+echo
+
+executar_comando "echo 1 > /proc/sys/vm/drop_caches" "Limpando a memória RAM"
+echo -e "${GREEN}Memória RAM limpa.${NC}"
+echo
+
+# Desativar qualquer swap existente
+executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualquer swap existente"
+
 # Escolha do tamanho da swap
 echo -e "${YELLOW}Escolha o tamanho da swap:${NC}"
 echo -e "${YELLOW}1) 10% do tamanho total do disco (recomendado)${NC}"
