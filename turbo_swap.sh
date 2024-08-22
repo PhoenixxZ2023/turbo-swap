@@ -201,6 +201,9 @@ executar_comando "systemctl daemon-reload && systemctl enable limpeza.service &&
 # Reiniciar o serviço SSH
 executar_comando "systemctl restart ssh" "Reiniciando o serviço SSH"
 
+# Retornar ao menu
+menu  # Substitua pelo caminho real para o seu script de menu
+
 echo -e "${GREEN}Configuração concluída.${NC}"
 
 return
