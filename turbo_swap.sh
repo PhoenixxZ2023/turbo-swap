@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+set -u
 
 CONFIG_FILE="/etc/ssh/sshd_config"
 TEMP_FILE="/tmp/sshd"
@@ -11,50 +13,6 @@ modify_sshd_config() {
         sed -i "s/$search/$replace/g" "$CONFIG_FILE"
     fi
 }
-
-# Modificar o arquivo de configuração do SSH
-modify_sshd_config "prohibit-password" "yes"
-modify_sshd_config "without-password" "yes"
-modify_sshd_config "#PermitRootLogin" "PermitRootLogin"
-
-# Remover entradas de configuração específicas
-for setting in "PasswordAuthentication" "X11Forwarding" "ClientAliveInterval" "ClientAliveCountMax" "MaxStartups"; do
-    sed -i "/^#\?\s*${setting}[[:space:]]/d" "$CONFIG_FILE"
-done
-
-# Adicionar configurações desejadas
-{
-    echo 'PasswordAuthentication yes'
-    echo 'X11Forwarding no'
-    echo 'ClientAliveInterval 60'
-    echo 'ClientAliveCountMax 3'
-    echo 'MaxStartups 100:10:1000'
-} >> "$CONFIG_FILE"
-
-# Remover o script gestor_swap.sh
-rm -f gestor_swap.sh
-
-# Função para verificar e instalar o bc se necessário
-verificar_bc() {
-    if ! command -v bc &> /dev/null; then
-        apt-get update &> /dev/null
-        apt-get install -y bc &> /dev/null
-        if [ $? -ne 0 ]; then
-            echo "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
-            exit 1
-        fi
-    fi
-}
-
-# Variáveis de cores para o terminal
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
-
-# Verificar a presença do bc
-verificar_bc
 
 # Função para executar comandos com barra de progresso
 executar_comando() {
@@ -91,10 +49,31 @@ executar_comando() {
     sleep 1
 }
 
+# Função para verificar e instalar o bc se necessário
+verificar_bc() {
+    if ! command -v bc &> /dev/null; then
+        apt-get update &> /dev/null
+        apt-get install -y bc &> /dev/null
+        if [ $? -ne 0 ]; then
+            echo "Erro ao instalar 'bc'. Verifique sua conexão com a internet ou instale manualmente."
+            exit 1
+        fi
+    fi
+}
+
+# Função para calcular e criar swap
+criar_swap() {
+    local swap_size_rounded="$1"
+    echo -e "${BLUE}Criando e ativando swap...${NC}"
+    executar_comando "dd if=/dev/zero of=/bin/ram.img bs=1M count=$swap_size_rounded && chmod 600 /bin/ram.img && mkswap /bin/ram.img && swapon /bin/ram.img" "Criando e ativando swap"
+    executar_comando "sed -i '/\/bin\/ram.img/d' /etc/fstab && echo '/bin/ram.img none swap sw 0 0' >> /etc/fstab" "Configurando swap"
+    echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
+}
+
 # Limpeza inicial
 clear
 echo -e "${YELLOW}======================================${NC}"
-echo -e "${YELLOW}              TURBO-SWAP${NC}"
+echo -e "${YELLOW}              OTMIZAÇÃO-PLUS${NC}"
 echo -e "${YELLOW}======================================${NC}"
 echo
 
@@ -121,13 +100,16 @@ echo -e "${YELLOW}3) 30% do tamanho total do disco${NC}"
 echo -e "${YELLOW}4) Definir tamanho manualmente${NC}"
 read -p "Selecione uma opção [1-4]: " swap_option
 
-# Determinar o tamanho da swap com base na opção escolhida
 case "$swap_option" in
     1) swap_percentage=0.10 ;;
     2) swap_percentage=0.20 ;;
     3) swap_percentage=0.30 ;;
     4)
         read -p "Digite o tamanho da swap em MB: " swap_size_rounded
+        if ! [[ "$swap_size_rounded" =~ ^[0-9]+$ ]]; then
+            echo -e "${RED}Tamanho da swap inválido. Deve ser um número inteiro.${NC}"
+            exit 1
+        fi
         ;;
     *)
         echo -e "${RED}Opção inválida. Saindo...${NC}"
@@ -135,8 +117,7 @@ case "$swap_option" in
         ;;
 esac
 
-if [ -z "$swap_size_rounded" ]; then
-    # Calcular o tamanho da swap
+if [ -z "${swap_size_rounded-}" ]; then
     echo -e "${BLUE}Calculando tamanho da swap...${NC}"
     disk=$(lsblk -o KNAME,TYPE | grep 'disk' | awk '{print $1}')
     if [ -z "$disk" ]; then
@@ -155,12 +136,7 @@ echo
 echo -e "${YELLOW}Tamanho da swap: ${swap_size_rounded} MB (${swap_size_rounded} MB / $(echo "$swap_size_rounded / 1024" | bc) GB)${NC}"
 echo
 
-# Criar e ativar swap
-executar_comando "dd if=/dev/zero of=/bin/ram.img bs=1M count=$swap_size_rounded && chmod 600 /bin/ram.img && mkswap /bin/ram.img && swapon /bin/ram.img" "Criando e ativando swap"
-executar_comando "sed -i '/\/bin\/ram.img/d' /etc/fstab && echo '/bin/ram.img none swap sw 0 0' >> /etc/fstab" "Configurando swap"
-
-echo -e "${GREEN}Swap criada e ativada com sucesso!${NC}"
-echo
+criar_swap "$swap_size_rounded"
 
 # Script de limpeza automático
 cat << 'EOF' > /opt/limpeza.sh
