@@ -101,22 +101,25 @@ executar_comando "swapoff -a && rm -f /swapfile /bin/ram.img" "Desativando qualq
 
 # Escolha do tamanho da swap
 echo -e "${YELLOW}Escolha o tamanho da swap:${NC}"
-echo -e "${YELLOW}1) 10% do tamanho total do disco (recomendado)${NC}"
-echo -e "${YELLOW}2) 20% do tamanho total do disco${NC}"
-echo -e "${YELLOW}3) 30% do tamanho total do disco${NC}"
-echo -e "${YELLOW}4) Definir tamanho manualmente${NC}"
-read -p "Selecione uma opção [1-4]: " swap_option
+echo -e "${YELLOW}1) 5% do tamanho total do disco${NC}"
+echo -e "${YELLOW}2) 10% do tamanho total do disco (recomendado)${NC}"
+echo -e "${YELLOW}3) 20% do tamanho total do disco${NC}"
+echo -e "${YELLOW}4) 30% do tamanho total do disco${NC}"
+echo -e "${YELLOW}5) Definir tamanho manualmente (em GB)${NC}"
+read -p "Selecione uma opção [1-5]: " swap_option
 
 case "$swap_option" in
-    1) swap_percentage=0.10 ;;
-    2) swap_percentage=0.20 ;;
-    3) swap_percentage=0.30 ;;
-    4)
-        read -p "Digite o tamanho da swap em MB: " swap_size_rounded
-        if ! [[ "$swap_size_rounded" =~ ^[0-9]+$ ]]; then
+    1) swap_percentage=0.05 ;;
+    2) swap_percentage=0.10 ;;
+    3) swap_percentage=0.20 ;;
+    4) swap_percentage=0.30 ;;
+    5)
+        read -p "Digite o tamanho da swap em GB: " swap_size_gb
+        if ! [[ "$swap_size_gb" =~ ^[0-9]+$ ]]; then
             echo -e "${RED}Tamanho da swap inválido. Deve ser um número inteiro.${NC}"
             exit 1
         fi
+        swap_size_rounded=$((swap_size_gb * 1024)) # Converter GB para MB
         ;;
     *)
         echo -e "${RED}Opção inválida. Saindo...${NC}"
